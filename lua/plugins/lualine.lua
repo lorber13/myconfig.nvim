@@ -14,7 +14,7 @@ return {
         right = "",
       },
       globalstatus = true,
-      theme = "catppuccin",
+      theme = "nitido",
     },
   },
 }
