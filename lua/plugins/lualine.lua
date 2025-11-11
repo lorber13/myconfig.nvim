@@ -13,7 +13,7 @@ return {
         left = "",
         right = "",
       },
-      globalstatus = true,
+      -- globalstatus = true,
       theme = "nitido",
     },
   },

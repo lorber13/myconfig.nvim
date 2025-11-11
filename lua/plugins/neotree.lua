@@ -3,18 +3,13 @@ return {
   branch = "v3.x",
   dependencies = {
     "nvim-lua/plenary.nvim",
-    "nvim-tree/nvim-web-devicons", -- not strictly required, but recommended
+    "nvim-tree/nvim-web-devicons",
     "MunifTanjim/nui.nvim",
-    -- {"3rd/image.nvim", opts = {}}, -- Optional image support in preview window: See `# Preview Mode` for more information
   },
-  lazy = false, -- neo-tree will lazily load itself
+  lazy = false,
   ---@module "neo-tree"
   ---@type neotree.Config?
   opts = {
-    -- sources = {
-    --   "filesystem",
-    --   "document_symbols",
-    -- },
     filesystem = {
       follow_current_file = {
         enabled = true,
@@ -24,12 +19,7 @@ return {
     },
     window = {
       mappings = {
-        ["<tab>"] = {
-          "toggle_preview",
-          config = {
-            use_float = false,
-          },
-        },
+        ["<tab>"] = { "toggle_preview", config = { use_float = false } },
       },
     },
     event_handlers = {
@@ -40,16 +30,6 @@ return {
           vim.cmd("Neotree close")
         end,
       },
-      -- {
-      --   event = "after_render",
-      --   handler = function()
-      --     local state = require("neo-tree.sources.manager").get_state("filesystem")
-      --     if not require("neo-tree.sources.common.preview").is_active() then
-      --       state.config = { use_float = false } -- or whatever your config is
-      --       state.commands.toggle_preview(state)
-      --     end
-      --   end,
-      -- },
     },
   },
   keys = {
@@ -64,6 +44,18 @@ return {
         })
       end,
       desc = "File tree",
+    },
+    {
+      "<leader>g",
+      function()
+        require("neo-tree.command").execute({
+          action = "focus",
+          toggle = true,
+          source = "git_status",
+          position = "left",
+        })
+      end,
+      desc = "Git status",
     },
   },
 }

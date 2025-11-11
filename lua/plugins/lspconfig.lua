@@ -1,21 +1,80 @@
 return {
   "neovim/nvim-lspconfig",
   dependencies = {
-    {
-      "j-hui/fidget.nvim",
-      opts = {
-        notification = {
-          window = {
-            winblend = 0,
-          },
-        },
-      },
-    },
+    { "j-hui/fidget.nvim", opts = {} },
+
+    -- "saghen/blink.cmp",
     "hrsh7th/cmp-nvim-lsp",
   },
   config = function()
+    vim.api.nvim_create_autocmd("LspAttach", {
+      group = vim.api.nvim_create_augroup("kickstart-lsp-attach", { clear = true }),
+      callback = function(event)
+        local map = function(keys, func, desc, mode)
+          mode = mode or "n"
+          vim.keymap.set(mode, keys, func, { buffer = event.buf, desc = "LSP: " .. desc })
+        end
+
+        map("grn", vim.lsp.buf.rename, "[R]e[n]ame")
+        map("gra", vim.lsp.buf.code_action, "[G]oto code [A]ction", { "n", "x" })
+        map("grr", require("telescope.builtin").lsp_references, "[G]oto [R]eferences")
+        map("gi", require("telescope.builtin").lsp_implementations, "[G]oto [I]mplementation")
+        map("gd", require("telescope.builtin").lsp_definitions, "[G]oto [D]efinition")
+        map("gD", vim.lsp.buf.declaration, "[G]oto [D]eclaration")
+        map("gO", require("telescope.builtin").lsp_document_symbols, "Open Document Symbols")
+        map("gW", require("telescope.builtin").lsp_dynamic_workspace_symbols, "Open Workspace Symbols")
+        map("gt", require("telescope.builtin").lsp_type_definitions, "[G]oto [T]ype Definition")
+
+        ---@param client vim.lsp.Client
+        ---@param method vim.lsp.protocol.Method
+        ---@param bufnr? integer
+        ---@return boolean
+        local function client_supports_method(client, method, bufnr)
+          if vim.fn.has("nvim-0.11") == 1 then
+            return client:supports_method(method, bufnr)
+          else
+            return client.supports_method(method, { bufnr = bufnr })
+          end
+        end
+
+        local client = vim.lsp.get_client_by_id(event.data.client_id)
+        if
+          client and client_supports_method(client, vim.lsp.protocol.Methods.textDocument_documentHighlight, event.buf)
+        then
+          local highlight_augroup = vim.api.nvim_create_augroup("kickstart-lsp-highlight", { clear = false })
+          vim.api.nvim_create_autocmd({ "CursorHold", "CursorHoldI" }, {
+            buffer = event.buf,
+            group = highlight_augroup,
+            callback = vim.lsp.buf.document_highlight,
+          })
+
+          vim.api.nvim_create_autocmd({ "CursorMoved", "CursorMovedI" }, {
+            buffer = event.buf,
+            group = highlight_augroup,
+            callback = vim.lsp.buf.clear_references,
+          })
+
+          vim.api.nvim_create_autocmd("LspDetach", {
+            group = vim.api.nvim_create_augroup("kickstart-lsp-detach", { clear = true }),
+            callback = function(event2)
+              vim.lsp.buf.clear_references()
+              vim.api.nvim_clear_autocmds({ group = "kickstart-lsp-highlight", buffer = event2.buf })
+            end,
+          })
+        end
+
+        if client and client_supports_method(client, vim.lsp.protocol.Methods.textDocument_inlayHint, event.buf) then
+          map("<leader>th", function()
+            vim.lsp.inlay_hint.enable(not vim.lsp.inlay_hint.is_enabled({ bufnr = event.buf }))
+          end, "[T]oggle Inlay [H]ints")
+        end
+      end,
+    })
+
     vim.diagnostic.config({
       severity_sort = true,
+      float = { border = "rounded", source = "if_many" },
+      underline = { severity = vim.diagnostic.severity.ERROR },
       signs = {
         text = {
           [vim.diagnostic.severity.ERROR] = "󰅚 ",
@@ -26,104 +85,44 @@ return {
       },
       virtual_text = {
         source = "if_many",
+        spacing = 2,
+        format = function(diagnostic)
+          local diagnostic_message = {
+            [vim.diagnostic.severity.ERROR] = diagnostic.message,
+            [vim.diagnostic.severity.WARN] = diagnostic.message,
+            [vim.diagnostic.severity.INFO] = diagnostic.message,
+            [vim.diagnostic.severity.HINT] = diagnostic.message,
+          }
+          return diagnostic_message[diagnostic.severity]
+        end,
       },
-    })
-
-    local trouble = require("trouble")
-
-    vim.api.nvim_create_autocmd("LspAttach", {
-      callback = function(args)
-        vim.keymap.set("n", "K", vim.lsp.buf.hover, {
-          desc = "View information",
-          buffer = args.buf,
-        })
-        vim.keymap.set("n", "gd", function()
-          trouble.open({
-            focus = true,
-            mode = "lsp_definitions",
-            keys = {
-              ["<CR>"] = "jump_close",
-            },
-          })
-        end, {
-          desc = "[G]oto [D]efinition",
-          buffer = args.buf,
-        })
-        vim.keymap.set("n", "gD", function()
-          trouble.open({
-            focus = true,
-            mode = "lsp_declarations",
-            keys = {
-              ["<CR>"] = "jump_close",
-            },
-          })
-        end, {
-          desc = "[G]oto [D]eclaration",
-          buffer = args.buf,
-        })
-        vim.keymap.set("n", "gr", function()
-          trouble.open({
-            focus = true,
-            mode = "lsp_references",
-            keys = {
-              ["<CR>"] = "jump_close",
-            },
-          })
-        end, {
-          desc = "[G]oto [R]eferences",
-          buffer = args.buf,
-        })
-        vim.keymap.set("n", "gi", function()
-          trouble.open({
-            focus = true,
-            mode = "lsp_implementations",
-            keys = {
-              ["<CR>"] = "jump_close",
-            },
-          })
-        end, {
-          desc = "[G]oto [I]mplementations",
-          buffer = args.buf,
-        })
-        vim.keymap.set("n", "<leader>rn", vim.lsp.buf.rename, {
-          desc = "[R]e[n]ame",
-          buffer = args.buf,
-        })
-        vim.keymap.set({ "n", "x" }, "<leader>ca", vim.lsp.buf.code_action, {
-          desc = "[C]ode [A]ction",
-          buffer = args.buf,
-        })
-      end,
     })
 
     local capabilities = require("cmp_nvim_lsp").default_capabilities()
-
-    -- lua-language-server
-    require("lspconfig").lua_ls.setup({
+    vim.lsp.config("lua_ls", {
       capabilities = capabilities,
       settings = {
         Lua = {
-          hint = {
-            enable = true,
-            setType = true,
+          completion = {
+            callSnippet = "Replace",
           },
+          diagnostics = { disable = { "missing-fields" } },
         },
       },
     })
-
-    require("lspconfig").ts_ls.setup({
+    vim.lsp.enable("lua_ls")
+    vim.lsp.config("ts_ls", {
       capabilities = capabilities,
     })
-
-    -- pyright
-    require("lspconfig").pyright.setup({
+    vim.lsp.enable("ts_ls")
+    vim.lsp.config("clangd", {
       capabilities = capabilities,
     })
-
-    -- clangd
-    require("lspconfig").clangd.setup({
+    vim.lsp.enable("clangd")
+    vim.lsp.config("pyright", {
       capabilities = capabilities,
     })
-    vim.lsp.inlay_hint.enable(true)
+    vim.lsp.enable("pyright")
   end,
+  vim.lsp.inlay_hint.enable(true),
 }
